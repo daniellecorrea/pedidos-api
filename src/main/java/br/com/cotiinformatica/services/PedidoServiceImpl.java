@@ -1,5 +1,6 @@
 package br.com.cotiinformatica.services;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.UUID;
 
@@ -10,10 +11,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import br.com.cotiinformatica.components.RabbitMQProducer;
 import br.com.cotiinformatica.dtos.PedidoRequest;
 import br.com.cotiinformatica.dtos.PedidoResponse;
 import br.com.cotiinformatica.entities.Pedido;
 import br.com.cotiinformatica.enums.StatusPedido;
+import br.com.cotiinformatica.events.PedidoCriado;
 import br.com.cotiinformatica.interfaces.PedidoService;
 import br.com.cotiinformatica.repositories.PedidoRepository;
 
@@ -21,6 +24,7 @@ import br.com.cotiinformatica.repositories.PedidoRepository;
 public class PedidoServiceImpl implements PedidoService {
 
 	@Autowired PedidoRepository pedidoRepository;
+	@Autowired RabbitMQProducer rabbitMQProducer;
 	
 	@Override
 	public PedidoResponse criar(PedidoRequest request) {
@@ -32,6 +36,11 @@ public class PedidoServiceImpl implements PedidoService {
 		pedido.setStatus(StatusPedido.PENDENTE);
 		
 		pedidoRepository.save(pedido);
+		
+		var pedidoCriado = mapper.map(pedido, PedidoCriado.class);
+		pedidoCriado.setDataHoraCriacao(LocalDateTime.now());
+		
+		rabbitMQProducer.send(pedidoCriado);
 		
 		return mapper.map(pedido, PedidoResponse.class);
 	}
